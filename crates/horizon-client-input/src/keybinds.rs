@@ -287,6 +287,7 @@ pub use horizon_client_core::key_display::display_name;
 /// A key event: what the layout writes on its key, without modifiers, names
 /// that key from now on (`key_display::learn_layout`), so an AZERTY player's
 /// Q key shows A.
+#[cfg(not(target_os = "ios"))]
 pub fn learn_layout(event: &winit::event::KeyEvent) {
     use winit::keyboard::{Key, PhysicalKey};
     use winit::platform::modifier_supplement::KeyEventExtModifierSupplement;
@@ -304,6 +305,12 @@ pub fn learn_layout(event: &winit::event::KeyEvent) {
     }
 }
 
+
+/// iOS: winit's `modifier_supplement` is not available on this target
+/// (it is only enabled for windows, macOS and X11), so layout learning is
+/// a no-op here; the caller keeps the same API on every target.
+#[cfg(target_os = "ios")]
+pub fn learn_layout(_event: &winit::event::KeyEvent) {}
 /// Current bindings by mapping name.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct KeyBinds {
