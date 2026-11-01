@@ -1,0 +1,102 @@
+# Horizon iOS — intento experimental de build para aarch64-apple-ios
+#
+# Dónde va este archivo en el fork: .github/workflows/ios-ipa.yml
+# (junto con la carpeta packaging-ios/ de este mismo paquete).
+#
+# Qué hace, sin maquillar resultados:
+#   1. cargo check por etapas para el target de iOS, empezando por los crates
+#      con más probabilidad de compilar y terminando en horizon-client.
+#   2. Si (y solo si) el check del cliente pasa, intenta el build release.
+#   3. Si hay binario, lo empaqueta como .ipa sin firmar con
+#      packaging-ios/make-ipa.sh y lo sube como artefacto.
+# Ningún paso de compilación lleva continue-on-error: si el código no
+# compila para iOS, el job queda en rojo y el artefacto útil de esa
+# ejecución son los logs (que se suben siempre), no un .ipa falso.
+
+name: ios-ipa (experimental)
+
+on:
+  workflow_dispatch:
+    inputs:
+      extra_cargo_args:
+        description: "Argumentos extra para cargo check/build (opcional)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  ios-build:
+    name: Build horizon-client para aarch64-apple-ios
+    runs-on: macos-14
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout del fork
+        uses: actions/checkout@v4
+
+      - name: Instalar Rust (stable) con el target de iOS
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios
+
+      - name: Versiones (para el log)
+        run: |
+          rustc --version
+          cargo --version
+          xcodebuild -version || true
+          rustup target list --installed
+
+      # Etapa 1: el crate que ya trae cfg para iOS (hidapi queda fuera ahí).
+      - name: "cargo check: horizon-dualsense (crate ya preparado para iOS)"
+        run: cargo check -p horizon-dualsense --target aarch64-apple-ios 2>&1 | tee check-dualsense.log
+
+      # Etapa 2: núcleo sin ventana ni red de escritorio.
+      - name: "cargo check: horizon-client-core"
+        run: cargo check -p horizon-client-core --target aarch64-apple-ios 2>&1 | tee check-client-core.log
+
+      # Etapa 3: el cliente completo, sin features por defecto.
+      # --no-default-features apaga `audio` (cpal) y `controllers`
+      # (gilrs + horizon-dualsense), los dos frentes con dependencias
+      # nativas sin backend iOS confirmado. El bin horizon-ctl (CLI de
+      # escritorio) se excluye pidiendo solo --bin horizon-client.
+      - name: "cargo check: horizon-client (sin features por defecto)"
+        run: >
+          cargo check -p horizon-client --bin horizon-client
+          --target aarch64-apple-ios --no-default-features
+          ${{ inputs.extra_cargo_args }} 2>&1 | tee check-client.log
+
+      # Solo si todo lo anterior pasó: el job ya estaría en rojo si no.
+      - name: "cargo build: horizon-client (release)"
+        run: >
+          cargo build -p horizon-client --bin horizon-client
+          --target aarch64-apple-ios --no-default-features --release
+          ${{ inputs.extra_cargo_args }} 2>&1 | tee build-client.log
+
+      - name: Empaquetar el .ipa sin firmar
+        run: |
+          test -f packaging-ios/make-ipa.sh || { echo "::error::Falta packaging-ios/make-ipa.sh en el fork (copia la carpeta packaging-ios/ junto a este workflow)."; exit 1; }
+          bash packaging-ios/make-ipa.sh \
+            target/aarch64-apple-ios/release/horizon-client \
+            "" \
+            Horizon-unsigned.ipa
+
+      - name: Subir el .ipa (solo si se produjo)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Horizon-unsigned-ipa
+          path: Horizon-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Subir los logs de compilación (siempre)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-logs
+          path: |
+            check-dualsense.log
+            check-client-core.log
+            check-client.log
+            build-client.log
+          if-no-files-found: warn
