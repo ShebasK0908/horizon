@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  PLANTILLA DE ARRANQUE — Horizon para iOS (port experimental, sin firmar)
+
+  Esto NO viene del repositorio de Horizon (que solo trae
+  packaging/macos/Info.plist, para la app de escritorio de macOS).
+  Es un punto de partida mínimo para empaquetar el binario
+  `horizon-client` compilado para aarch64-apple-ios como .app de iPhone.
+  Habrá que ajustarlo cuando el cliente compile y arranque: permisos,
+  capacidades, nombre visible, iconos (hacen falta los AppIcon de iOS,
+  los .ico/.png de packaging/icons no sirven tal cual), etc.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>Horizon</string>
+	<!-- Debe coincidir con el nombre del ejecutable que deja make-ipa.sh
+	     dentro de Horizon.app (el script copia el binario con este nombre). -->
+	<key>CFBundleExecutable</key>
+	<string>Horizon</string>
+	<key>CFBundleIdentifier</key>
+	<string>dev.horizon.client</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Horizon</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<!-- iOS mínimo del port: 17.0 -->
+	<key>MinimumOSVersion</key>
+	<string>17.0</string>
+	<!-- Familia iPhone (1). iPad sería 2; no incluido en esta plantilla. -->
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+	</array>
+	<key>UIRequiresFullScreen</key>
+	<true/>
+	<!-- Vertical y horizontal: el juego es apaisado, pero los menús y la
+	     carga pasan por vertical en algunos teléfonos; se permiten ambas. -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+</dict>
+</plist>
