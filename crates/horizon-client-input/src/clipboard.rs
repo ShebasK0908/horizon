@@ -122,9 +122,10 @@ pub trait Clipboard {
 /// The system clipboard (`ClipboardManager`). On Wayland, arboard uses the
 /// data-control protocol and falls back to X11 (XWayland) on compositors
 /// without it. When no system clipboard can be reached, text copied in the
-/// game can still be pasted in the game.
+/// game can still be pasted in the game. On iOS arboard has no backend, so this is the in-memory clipboard only: copy and paste work inside the game, nothing reaches the system's pasteboard.
 #[derive(Default)]
 pub struct SystemClipboard {
+    #[cfg(not(target_os = "ios"))]
     system: Option<arboard::Clipboard>,
     /// The text Horizon last copied (`horizon-ctl status`).
     copied: Option<String>,
@@ -135,6 +136,7 @@ impl SystemClipboard {
     pub fn copied(&self) -> Option<&str> {
         self.copied.as_deref()
     }
+    #[cfg(not(target_os = "ios"))]
     fn system(&mut self) -> Option<&mut arboard::Clipboard> {
         if self.system.is_none() {
             self.system = arboard::Clipboard::new().ok();
@@ -145,24 +147,32 @@ impl SystemClipboard {
 
 impl Clipboard for SystemClipboard {
     fn get(&mut self) -> String {
-        let Some(system) = self.system() else {
-            return self.copied.clone().unwrap_or_default();
-        };
-        match system.get_text() {
-            Ok(text) => text,
-            Err(arboard::Error::ContentNotAvailable) => String::new(),
-            Err(_) => {
-                // A lost connection (a restarted compositor): reconnect next time.
-                self.system = None;
-                String::new()
-            }
+        #[cfg(target_os = "ios")]
+        {
+                        self.copied.clone().unwrap_or_default()
         }
+                #[cfg(not(target_os = "ios"))]
+        {
+                        let Some(system) = self.system() else {
+                return self.copied.clone().unwrap_or_default();
+            };
+            match system.get_text() {
+                Ok(text) => text,
+                Err(arboard::Error::ContentNotAvailable) => String::new(),
+                Err(_) => {
+                    // A lost connection (a restarted compositor): reconnect next time.
+                    self.system = None;
+                    String::new()
+                }
+            }
+                }
     }
     fn set(&mut self, text: &str) {
         if text.is_empty() {
             return;
         }
         self.copied = Some(text.to_owned());
+        #[cfg(not(target_os = "ios"))]
         if let Some(system) = self.system()
             && system.set_text(text.to_owned()).is_err()
         {
